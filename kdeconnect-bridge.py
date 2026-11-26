@@ -424,7 +424,7 @@ class Bridge:
         if not d or not d.get("isPaired"):
             self.apps_key.pop(dev_id, None)
             self.apps_sent.pop(dev_id, None)
-            if dev_id in self.was_paired and d is not None or (d is None and dev_id in self.was_paired and self.daemon_up):
+            if d is not None and dev_id in self.was_paired:
                 # unpaired: its apps and icons go (C4 does the same for launcher entries)
                 self.was_paired.discard(dev_id)
                 phone_apps.remove_cache(base, dev_id)
@@ -781,6 +781,21 @@ class FixtureBridge(Bridge):
 
     def storage(self, dev_id):
         self.storage_event(dev_id, "idle")
+
+    def push_notifications(self, dev_id):
+        emit({"event": "notifications", "deviceId": dev_id, "list": []})
+
+    def handle(self, c):
+        cmd = c.get("cmd", "")
+        if cmd == "refresh":
+            self.tools()
+            self.push_devices()
+            self.sync_all_apps(force=True)
+        elif cmd in ("pair", "unpair", "acceptPair", "cancelPair", "requestConversations", "requestConversation",
+                     "sendMessage", "sendToAddress", "ring", "ping", "shareText", "shareUrl", "dismiss", "replyNotif"):
+            pass                                   # nothing to talk to
+        else:
+            super().handle(c)
 
     def run(self):
         emit({"event": "hello", "installed": True})
