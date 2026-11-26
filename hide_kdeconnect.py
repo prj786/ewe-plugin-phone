@@ -151,9 +151,17 @@ def save_state(st):
             pass
 
 
+def eep_exe():
+    """EWE_PHONE_EEP=<path> picks the eep to use ("none" = no eep): for tests."""
+    o = os.environ.get("EWE_PHONE_EEP")
+    if o is not None:
+        return o if o != "none" and os.access(o, os.X_OK) else None
+    return shutil.which("eep")
+
+
 def eep_cards():
     """{entry file name: card id} of the cards eep keeps for found apps; {} without eep."""
-    exe = shutil.which("eep")
+    exe = eep_exe()
     if not exe:
         return {}
     try:
@@ -169,7 +177,7 @@ def eep_cards():
 
 
 def eep_run(*args):
-    exe = shutil.which("eep")
+    exe = eep_exe()
     if not exe:
         return False
     try:

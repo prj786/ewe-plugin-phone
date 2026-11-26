@@ -587,24 +587,39 @@ class Bridge:
 
     # ── commands from QML ────────────────────────────────────────────────────
     def on_stdin(self, source, condition):
-        if condition & GLib.IO_HUP:
-            self.loop.quit()
-            return False
-        line = sys.stdin.readline()
-        if line == "":
-            self.loop.quit()
-            return False
+        # read the fd itself and split lines here: sys.stdin.readline() takes one
+        # line and leaves the rest in Python's buffer, where the watch (which
+        # only sees the fd) never fires for them — a burst of commands stalled
+        if not hasattr(self, "inbuf"):
+            self.inbuf = b""
         try:
-            c = json.loads(line)
+            data = os.read(sys.stdin.fileno(), 65536) if condition & GLib.IO_IN else b""
+        except OSError:
+            data = b""
+        if data == b"":
+            self.loop.quit()
+            return False
+        self.inbuf += data
+        while b"\n" in self.inbuf:
+            line, self.inbuf = self.inbuf.split(b"\n", 1)
+            self.command_line(line)
+        if len(self.inbuf) > 1 << 20:
+            self.inbuf = b""                  # a line that never ends is not a command
+        return True
+
+    def command_line(self, raw):
+        try:
+            c = json.loads(raw.decode("utf-8", "replace"))
+            if not isinstance(c, dict):
+                return
         except ValueError:
-            return True
+            return
         try:
             self.handle(c)
         except dbus.DBusException as e:
             emit({"event": "error", "cmd": c.get("cmd", "?"), "error": e.get_dbus_message()})
         except Exception as e:  # never die on a bad command
             emit({"event": "error", "cmd": c.get("cmd", "?"), "error": str(e)})
-        return True
 
     def checked(self, dev_id):
         """A device id that goes into an object path: what kdeconnectd writes, nothing else."""
@@ -721,6 +736,7 @@ class FixtureBridge(Bridge):
         self.daemon_up = True
         self.devices, self.apps_key, self.apps_sent, self.was_paired = {}, {}, {}, set()
         self.fx, self.mtime = {}, 0
+        self.mounted_fx = set()
         GLib.io_add_watch(sys.stdin, GLib.PRIORITY_DEFAULT, GLib.IO_IN | GLib.IO_HUP, self.on_stdin)
         GLib.timeout_add(1000, self.poll)
 
@@ -774,13 +790,20 @@ class FixtureBridge(Bridge):
                 self.storage_event(dev_id, "error", error="failed",
                                    message="Your phone did not answer. Unlock it, keep it on this network, then try again.")
             else:
-                root = cfg.get("root", "/nonexistent")
-                self.finish_storage(dev_id, root, {os.path.join(root, "storage/emulated/0"): "Internal shared storage"})
+                self.mounted_fx.add(dev_id)
+                self.resolve_fixture(dev_id)
             return False
         GLib.timeout_add(900, done)
 
     def storage(self, dev_id):
-        self.storage_event(dev_id, "idle")
+        if dev_id in self.mounted_fx:
+            self.resolve_fixture(dev_id)
+        else:
+            self.storage_event(dev_id, "idle")
+
+    def resolve_fixture(self, dev_id):
+        root = self.fx.get("storage", {}).get(dev_id, {}).get("root", "/nonexistent")
+        self.finish_storage(dev_id, root, {os.path.join(root, "storage/emulated/0"): "Internal shared storage"})
 
     def push_notifications(self, dev_id):
         emit({"event": "notifications", "deviceId": dev_id, "list": []})

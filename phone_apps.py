@@ -204,6 +204,7 @@ def write_cache(base, dev_id, dev_name, apps, now_ms=None):
     os.makedirs(icons, mode=0o700, exist_ok=True)
     have = set()
     entries = []
+    icon_changed = False
     for a in apps:
         path = ""
         png = a.get("png")
@@ -211,6 +212,7 @@ def write_cache(base, dev_id, dev_name, apps, now_ms=None):
             p = os.path.join(icons, a["package"] + ".png")
             if _read(p) != png:                      # rewritten only when the bytes change
                 _atomic(p, png)
+                icon_changed = True
             have.add(a["package"] + ".png")
             path = p
         entries.append({"package": a["package"], "name": a["name"], "sys": bool(a.get("sys")), "icon": path})
@@ -227,7 +229,7 @@ def write_cache(base, dev_id, dev_name, apps, now_ms=None):
         pass
     name = clean_name(dev_name)
     old = read_cache(base, dev_id)
-    if old and old["deviceName"] == name and old["apps"] == entries:
+    if old and not icon_changed and old["deviceName"] == name and old["apps"] == entries:
         return old, False
     doc = {"v": 1, "device": dev_id, "deviceName": name,
            "updated": int(time.time() * 1000) if now_ms is None else int(now_ms), "apps": entries}

@@ -223,7 +223,6 @@ Scope {
         // keys land here when the search field does not hold the focus
         Item {
             id: catcher
-            width: 1; height: 1
             Keys.onPressed: function (ev) { root.key(ev) }
         }
 
