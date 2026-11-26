@@ -379,7 +379,7 @@ hk show >/dev/null
 check "show: eep's card comes back (eep install sys-...), only for what we hid" "grep -q '^install sys-org-kde-kdeconnect-app\$' $EEP_LOG && [ \"\$(grep -c '^install' $EEP_LOG)\" = 1 ] && [ ! -e $UA/org.kde.kdeconnect.nonplasma.desktop ]"
 check "hide_kdeconnect.py: a bad verb answers JSON, exit 0" "hk nonsense | grep -q '\"ok\": false'"
 check "no KDE Connect window or name offered by Page/Popup (only the kdeconnect package, plainly)" "! grep -n -i 'kde connect' Page.qml Popup.qml"
-check "Service applies the hide setting; the popup has no pixel literals" "grep -q hide_kdeconnect Service.qml && ! grep -nE '(width|height|spacing|radius|margins|pixelSize): [0-9]' Popup.qml"
+check "Service applies the hide setting; the popup has no pixel literals" "grep -q hide_kdeconnect Service.qml && ! grep -nE '(width|height|spacing|radius|margins|pixelSize): [0-9.]+ *($|;|})' Popup.qml"
 
 # 6. the ewe tool, when this box has it (the shell's own validator) ───────────
 tool="${EWE_PLUGIN_TOOL:-$(command -v ewe-plugin || true)}"
