@@ -761,8 +761,11 @@ class FixtureBridge(Bridge):
 
     def poll(self):
         if self.load():
+            self.mounted_fx.clear()                # a new scenario starts unmounted
             self.push_devices()
             self.sync_all_apps(force=True)
+            for i in list(self.devices):
+                self.storage_event(i, "idle")
         return True
 
     def read_commands(self, dev_id):
